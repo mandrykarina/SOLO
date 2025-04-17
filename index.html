@@ -2,19 +2,54 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Симулятор логических операций</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Решение задачи коммивояжёра онлайн</title>
     <link rel="stylesheet" href="styles/main.css">
-</head>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    </head>
 <body>
-    <div class="container">
+    <div class="input-contain">
         <h1>Генератор таблиц истинности</h1>
-        <input type="text" id="logicExpr" placeholder="Введите выражение (A ∧ B ∨ ¬C)">
-        <button id="generateBtn">Построить</button>
-        <div id="truthTable"></div>
-        <div id="circuitDiagram"></div>
+        
+            <input type="text" id="logicExpr" placeholder="Введите (A ∧ B ∨ ¬C)">
+            <button id="generateBtn">Построить</button>
+        
+        
+            <div class="output-container">
+                <div class="table-container">
+                    <div id="truthTable"></div>
+                </div>
+                <div class="circuit-container">
+                    <canvas id="circuitDiagram"></canvas>
+                </div>
+            </div>
     </div>
     <script src="scripts/truthTable.js"></script>
     <script src="scripts/circuit.js"></script>
-    <script src="scripts/main.js"></script>
+    <script>
+        // Инициализация и подключение к интерфейсу
+        document.addEventListener('DOMContentLoaded', () => {
+            const generateBtn = document.getElementById('generateBtn');
+            const logicExprInput = document.getElementById('logicExpr');
+            
+            generateBtn.addEventListener('click', () => {
+                const expr = logicExprInput.value;
+                generateTruthTable(expr);
+                
+                // Инициализируем схему только при первом использовании
+                if (!window.logicCircuit) {
+                    window.logicCircuit = new LogicCircuit('circuitDiagram');
+                }
+                window.logicCircuit.drawCircuit(expr);
+            });
+            
+            // Обработка нажатия Enter в поле ввода
+            logicExprInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    generateBtn.click();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
