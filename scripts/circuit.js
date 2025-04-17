@@ -6,8 +6,8 @@ class LogicCircuit {
         this.ctx = this.canvas.getContext('2d');
         this.gateSize = 40;
         this.padding = 40;
-        this.variableSpacing = 60;
         this.horizontalSpacing = 120;
+        this.verticalSpacing = 60;
     }
 
     clear() {
@@ -99,115 +99,154 @@ class LogicCircuit {
     }
 
     parseExpression(expr) {
-        // Разбиваем выражение на токены
-        const tokens = expr.match(/([A-Za-z]+|[∧∨¬⇒⇔()]|&&|\|\||!|=>|===)/g) || [];
+        // Удаляем все пробелы для упрощения парсинга
+        expr = expr.replace(/\s/g, '');
         
-        // Преобразуем в обратную польскую нотацию (RPN)
-        const output = [];
-        const operators = [];
-        const precedence = {
-            '!': 4, '¬': 4,
-            '∧': 3, '&&': 3,
-            '∨': 2, '||': 2,
-            '⇒': 1, '=>': 1,
-            '⇔': 0, '===': 0
-        };
-
-        for (const token of tokens) {
-            if (/[A-Za-z]+/.test(token)) {
-                output.push(token);
-            } else if (token === '(') {
-                operators.push(token);
-            } else if (token === ')') {
-                while (operators.length && operators[operators.length - 1] !== '(') {
-                    output.push(operators.pop());
+        const tokens = [];
+        let i = 0;
+        
+        while (i < expr.length) {
+            if (expr[i] === '(' || expr[i] === ')') {
+                tokens.push(expr[i]);
+                i++;
+            }
+            // Проверяем многосимвольные операторы (=>, ===, &&, ||)
+            else if (expr.substr(i, 3) === '===') {
+                tokens.push('===');
+                i += 3;
+            }
+            else if (expr.substr(i, 2) === '=>') {
+                tokens.push('=>');
+                i += 2;
+            }
+            else if (expr.substr(i, 2) === '&&') {
+                tokens.push('&&');
+                i += 2;
+            }
+            else if (expr.substr(i, 2) === '||') {
+                tokens.push('||');
+                i += 2;
+            }
+            // Односимвольные операторы
+            else if (['∧', '∨', '¬', '⇒', '⇔', '!'].includes(expr[i])) {
+                tokens.push(expr[i]);
+                i++;
+            }
+            // Переменные (буквы)
+            else if (/[A-Za-z]/.test(expr[i])) {
+                let varName = '';
+                while (i < expr.length && /[A-Za-z]/.test(expr[i])) {
+                    varName += expr[i];
+                    i++;
                 }
-                operators.pop(); // Удаляем '('
-            } else {
-                while (operators.length && 
-                       operators[operators.length - 1] !== '(' &&
-                       precedence[operators[operators.length - 1]] >= precedence[token]) {
-                    output.push(operators.pop());
-                }
-                operators.push(token);
+                tokens.push(varName);
+            }
+            else {
+                i++; // Пропускаем неизвестные символы
             }
         }
-
-        while (operators.length) {
-            output.push(operators.pop());
-        }
-
-        return output;
+        
+        return tokens;
     }
 
     buildExpressionTree(tokens) {
         const stack = [];
-        
+        const output = [];
+        const precedence = {
+            '!': 5, '¬': 5,
+            '∧': 4, '&&': 4,
+            '∨': 3, '||': 3,
+            '⇒': 2, '=>': 2,
+            '⇔': 1, '===': 1
+        };
+
         for (const token of tokens) {
             if (/[A-Za-z]+/.test(token)) {
-                stack.push({
-                    type: 'variable',
-                    value: token
-                });
-            } else {
-                let right, left;
-                if (token === '¬' || token === '!') {
-                    right = stack.pop();
-                    stack.push({
-                        type: 'operation',
-                        op: token,
-                        right
-                    });
-                } else {
-                    right = stack.pop();
-                    left = stack.pop();
-                    stack.push({
-                        type: 'operation',
-                        op: token,
-                        left,
-                        right
-                    });
+                output.push({ type: 'variable', value: token });
+            } else if (token === '(') {
+                stack.push(token);
+            } else if (token === ')') {
+                while (stack.length && stack[stack.length - 1] !== '(') {
+                    this.processOperator(stack.pop(), output);
                 }
+                stack.pop(); // Удаляем '('
+            } else {
+                while (stack.length && stack[stack.length - 1] !== '(' &&
+                       precedence[stack[stack.length - 1]] >= precedence[token]) {
+                    this.processOperator(stack.pop(), output);
+                }
+                stack.push(token);
             }
         }
-        
-        return stack.pop();
+
+        while (stack.length) {
+            this.processOperator(stack.pop(), output);
+        }
+
+        return output[0];
+    }
+
+    processOperator(op, output) {
+        if (op === '¬' || op === '!') {
+            const right = output.pop();
+            output.push({
+                type: 'operation',
+                op,
+                right,
+                isNegated: true
+            });
+        } else {
+            const right = output.pop();
+            const left = output.pop();
+            output.push({
+                type: 'operation',
+                op,
+                left,
+                right
+            });
+        }
     }
 
     drawExpression(node, startX, startY, depth = 0) {
         if (node.type === 'variable') {
-            const isNegated = false; // Отрицание обрабатывается в операциях
             const line = this.drawInputLine(
                 startX, 
                 startY, 
                 50, 
-                node.value, 
-                isNegated
+                node.value,
+                false
             );
-            return { ...line, width: 50 };
+            return { 
+                x: line.x, 
+                y: line.y,
+                width: 50,
+                height: 0
+            };
         }
 
         const gateX = startX + 100 + depth * this.horizontalSpacing;
-        let gateY = startY;
         
-        // Рисуем левую часть (если есть)
+        // Рисуем правую часть (для NOT) или обе части (для бинарных операций)
+        let rightResult = this.drawExpression(node.right, startX, startY, depth + 1);
+        
         let leftResult = null;
         if (node.left) {
-            leftResult = this.drawExpression(node.left, startX, startY, depth + 1);
-            gateY = leftResult.y;
+            leftResult = this.drawExpression(
+                node.left, 
+                startX, 
+                startY + rightResult.height + this.verticalSpacing, 
+                depth + 1
+            );
         }
-        
-        // Рисуем правую часть
-        let rightResult = this.drawExpression(node.right, startX, 
-            node.left ? startY + this.variableSpacing : startY, 
-            depth + 1);
-        
-        if (!node.left) {
-            gateY = rightResult.y;
-        } else {
+
+        // Вычисляем положение гейта
+        let gateY;
+        if (node.left) {
             gateY = (leftResult.y + rightResult.y) / 2;
+        } else {
+            gateY = rightResult.y;
         }
-        
+
         // Рисуем саму операцию
         const gate = this.drawGate(gateX, gateY, this.getOperationName(node.op));
         
@@ -219,9 +258,10 @@ class LogicCircuit {
             this.ctx.stroke();
         }
         
+        const inputIndex = node.left ? 1 : 0;
         this.ctx.beginPath();
         this.ctx.moveTo(rightResult.x, rightResult.y);
-        this.ctx.lineTo(gate.inputs[node.left ? 1 : 0].x, gate.inputs[node.left ? 1 : 0].y);
+        this.ctx.lineTo(gate.inputs[inputIndex].x, gate.inputs[inputIndex].y);
         this.ctx.stroke();
         
         // Для отрицания рисуем кружок
@@ -234,7 +274,26 @@ class LogicCircuit {
         return { 
             x: gate.output.x, 
             y: gate.output.y,
-            width: 100 + depth * this.horizontalSpacing
+            width: 100 + depth * this.horizontalSpacing,
+            height: (node.left ? leftResult.height + rightResult.height + this.verticalSpacing : rightResult.height)
+        };
+    }
+
+    calculateCanvasSize(node) {
+        if (node.type === 'variable') {
+            return { width: 200, height: 80 };
+        }
+        
+        const rightSize = this.calculateCanvasSize(node.right);
+        let leftSize = { width: 0, height: 0 };
+        
+        if (node.left) {
+            leftSize = this.calculateCanvasSize(node.left);
+        }
+        
+        return {
+            width: Math.max(leftSize.width, rightSize.width) + this.horizontalSpacing,
+            height: leftSize.height + rightSize.height + (node.left ? this.verticalSpacing : 0)
         };
     }
 
@@ -246,14 +305,11 @@ class LogicCircuit {
             const expressionTree = this.buildExpressionTree(tokens);
             
             // Рассчитываем размеры canvas
-            const variables = this.collectVariables(expressionTree);
-            const height = this.padding * 2 + variables.length * this.variableSpacing;
-            const width = 800;
-            this.setCanvasSize(width, height);
+            const { width, height } = this.calculateCanvasSize(expressionTree);
+            this.setCanvasSize(width + 200, Math.max(height + 100, 300));
             
             // Рисуем выражение
-            const startY = this.padding + (variables.length - 1) * this.variableSpacing / 2;
-            const result = this.drawExpression(expressionTree, this.padding, startY);
+            const result = this.drawExpression(expressionTree, this.padding, this.padding);
             
             // Рисуем выход
             this.drawOutputLine(result.x, result.y, 100, expr);
@@ -265,22 +321,6 @@ class LogicCircuit {
             this.ctx.textAlign = 'center';
             this.ctx.fillText('Error: ' + e.message, this.canvas.width / 2, 30);
         }
-    }
-
-    collectVariables(node) {
-        if (node.type === 'variable') {
-            return [node.value];
-        }
-        
-        const vars = [];
-        if (node.left) {
-            vars.push(...this.collectVariables(node.left));
-        }
-        if (node.right) {
-            vars.push(...this.collectVariables(node.right));
-        }
-        
-        return [...new Set(vars)]; // Удаляем дубликаты
     }
 
     getOperationName(op) {

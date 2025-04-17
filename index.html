@@ -10,20 +10,22 @@
 <body>
     <div class="input-contain">
         <h1>Генератор таблиц истинности</h1>
-        
+        <h2>Операторы: '∧' - '&&', '∨' - '||', '¬' - '!', '⇒' - '=>', '⇔' - '==='</h2>
             <input type="text" id="logicExpr" placeholder="Введите (A ∧ B ∨ ¬C)">
+            
             <button id="generateBtn">Построить</button>
-        
-        
+            
             <div class="output-container">
                 <div class="table-container">
                     <div id="truthTable"></div>
                 </div>
                 <div class="circuit-container">
                     <canvas id="circuitDiagram"></canvas>
+                    
                 </div>
             </div>
     </div>
+    <button id="explainBtn">Объяснить схему</button>
     <script src="scripts/truthTable.js"></script>
     <script src="scripts/circuit.js"></script>
     <script>
@@ -51,5 +53,7 @@
             });
         });
     </script>
+    <button id="explainBtn">Explain Circuit</button>
+    <div id="explanation"></div>
 </body>
 </html>
